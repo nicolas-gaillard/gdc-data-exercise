@@ -30,6 +30,7 @@ __Postgresql__
 * adheres more closely to SQL standards
 
 __SQLAlchemy__
+
 I made the choice to have a more generic brick at the cost of performance.
 As a result, it is easier to change the provider.
 Nevertheless, using chunksize in `pandas.to_sql` method allows to simulate bulk insert and to obtain acceptable performances.
@@ -40,7 +41,7 @@ I've chosen to separate users' connections in a separate table (and dropped misc
 
 ### Datascience part
 
-I didn't have time to process that part.
+I didn't have enough time to process this part as I had planned.
 
 My initial goal was to analyze the time between the publication of an ad and its transaction in order to identify a potential user alert suggesting to put his ad back on top of the pile.
 
