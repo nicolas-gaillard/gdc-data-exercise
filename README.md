@@ -49,8 +49,12 @@ Unfortunately, I only produced a graph showing the distribution of this delta by
 
 ![chart](/data/time_to_be_sold.png)
 
+### Testing
+
+Install `pytest 6.1.2` and then run `pytest` at the root of the project for launching few tests.
+
 ### Next steps and optimizations
-* Adding tests (not enough time)
+* Adding more tests (not enough time)
 * Speeding up the application
   * optimizing some data treatment
   * using database driver and bulk insert
