@@ -2,9 +2,9 @@ import ast
 import datetime as dt
 import logging
 import re
+import sys
 import numpy as np
 import pandas as pd
-import sys
 from sqlalchemy import create_engine
 from sqlalchemy import types
 
@@ -16,6 +16,8 @@ class FileManager():
     REFERRALS = 'referrals.csv'
     USERS = 'users.csv'
     SCHEMA = 'gdc'
+    END_OF_CLEANING_MESSAGE = 'End of cleaning, insertion start'
+    END_OF_INSERTION_MESSAGE = 'End of insertion'
 
     def __init__(
             self,
@@ -52,24 +54,12 @@ class FileManager():
             "id": "user_id"
         }
         df.rename(columns=columns, inplace=True)
-        sex_replacements = {
-            'sex': {
-                r'([mM]\.?$|[mM]r\.?$|[mM]ister\.?$)': 'M',
-                r'([mM]rs\.?$|[mM]s\.?$|[mM]iss\.?$)': 'F'
-            }
-        }
-        df.replace(sex_replacements, regex=True, inplace=True)
+        df = self._clean_sex(df)
+        df = self.__clean_misc(df)
 
-        # Parsing misc
-        df = df.join(df['misc'].apply(lambda x: ast.literal_eval(x)).apply(pd.Series))
-        df['phone_number'] = df['phone_number'].apply(lambda x: self.__format_phone(x))
-        user_connections = df[['user_id', 'connections']]
-        self.__create_users_connection(user_connections)
-        df = df.drop(['misc', 'connections'], axis=1)
-
-        logging.info("End of cleaning, insertion start")
+        logging.info(f"{self.END_OF_CLEANING_MESSAGE}")
         self.__insert(df, 'users', dtype=None)
-        logging.info("End of insertion")
+        logging.info(f"{self.END_OF_INSERTION_MESSAGE}")
 
         return df
 
@@ -87,13 +77,8 @@ class FileManager():
             date_parser=self.__date_parse,
             nrows=nrows
         )
+        self._clean_real_estate(df)
 
-        real_estate_regex = r're?a?l[\w\s]?estate'
-        df['category'] = df['category'].str.lower().replace(
-            real_estate_regex,
-            'real_estate',
-            regex=True
-        )
         columns = {
             "id": "ad_id"
         }
@@ -102,9 +87,9 @@ class FileManager():
         cols = [cols[-1]] + cols[:-1]
         df = df[cols]
 
-        logging.info("End of cleaning, insertion start")
+        logging.info(f"{self.END_OF_CLEANING_MESSAGE}")
         self.__insert(df, 'ads', None)
-        logging.info("End of insertion")
+        logging.info(f"{self.END_OF_INSERTION_MESSAGE}")
 
         return df
 
@@ -124,9 +109,9 @@ class FileManager():
         df.rename(columns=columns, inplace=True)
         df['sold_price'] = df['sold_price'].round(2)
 
-        logging.info("End of cleaning, insertion start")
+        logging.info(f"{self.END_OF_CLEANING_MESSAGE}")
         self.__insert(df, "ads_transaction", None)
-        logging.info("End of insertion")
+        logging.info(f"{self.END_OF_INSERTION_MESSAGE}")
 
         return df
 
@@ -145,11 +130,38 @@ class FileManager():
         df.rename(columns=columns, inplace=True)
         df.deleted_at = df.deleted_at.fillna(np.datetime64('NaT'))
 
-        logging.info("End of cleaning, insertion start")
+        logging.info(f"{self.END_OF_CLEANING_MESSAGE}")
         self.__insert(df, "referrals", None)
-        logging.info("End of insertion")
+        logging.info(f"{self.END_OF_INSERTION_MESSAGE}")
 
         return df
+
+    @staticmethod
+    def _clean_sex(df: pd.DataFrame) -> pd.DataFrame:
+        sex_replacements = {
+            'sex': {
+                r'([mM]\.?$|[mM]r\.?$|[mM]ister\.?$)': 'M',
+                r'([mM]rs\.?$|[mM]s\.?$|[mM]iss\.?$)': 'F'
+            }
+        }
+        return df.replace(sex_replacements, regex=True)
+
+    @staticmethod
+    def _clean_real_estate(df: pd.DataFrame) -> pd.DataFrame:
+        real_estate_regex = r're?a?l[\w\s]?estate'
+        df['category'] = df['category'].str.lower().replace(
+            real_estate_regex,
+            'real_estate',
+            regex=True
+        )
+        return df
+
+    def __clean_misc(self, df: pd.DataFrame) -> pd.DataFrame:
+        df = df.join(df['misc'].apply(lambda x: ast.literal_eval(x)).apply(pd.Series))
+        df['phone_number'] = df['phone_number'].apply(lambda x: self.__format_phone(x))
+        user_connections = df[['user_id', 'connections']]
+        self.__create_users_connection(user_connections)
+        return df.drop(['misc', 'connections'], axis=1)
 
     def __insert(
             self,
